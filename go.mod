@@ -1,4 +1,4 @@
-module github.com/foks-proj/go-git/remhelp
+module github.com/foks-proj/go-git-remhelp
 
 go 1.21.6
 
