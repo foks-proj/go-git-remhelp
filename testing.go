@@ -49,6 +49,10 @@ func (r *TestScratchRepo) inDir(t *testing.T, fn func() error) error {
 	return ret
 }
 
+func (r *TestScratchRepo) init(t *testing.T) {
+	r.Git(t, "init", "-b", "main")
+}
+
 func (r *TestScratchRepo) setenv(t *testing.T) {
 	r.env.setenv(t)
 }

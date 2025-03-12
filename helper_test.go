@@ -57,7 +57,7 @@ func TestSimplePushFetch(t *testing.T) {
 
 	sr.WriteFileBinary(t, "biggie", big)
 
-	sr.Git(t, "init")
+	sr.init(t)
 
 	sr.Git(t, "add", ".")
 	sr.Git(t, "commit", "-m", "initial commit")
@@ -153,7 +153,7 @@ func TestPack(t *testing.T) {
 		mkFileCluster(t, sr, dir, n, sz, doPack)
 	}
 
-	sr.Git(t, "init")
+	sr.init(t)
 	cluster(sr, "a/", true)
 	cluster(sr, "b/", true)
 	cluster(sr, "c/", false)
@@ -214,7 +214,7 @@ func TestCleanTmps(t *testing.T) {
 
 	// populate the scratch repo with some files, stuff, etc.
 	sr := te.NewScratchRepo(t)
-	sr.Git(t, "init")
+	sr.init(t)
 	sr.Mkdir(t, "a/b")
 	sr.WriteFile(t, "a/b/1", "11111")
 	sr.Git(t, "add", ".")
@@ -255,7 +255,7 @@ func TestPackOnlyPush(t *testing.T) {
 		mkFileCluster(t, sr, dir, n, sz, doPack)
 	}
 
-	sr.Git(t, "init")
+	sr.init(t)
 	cluster(sr, "a/", true)
 
 	sr.Git(t, "remote", "add", "origin", sr.Origin())
@@ -287,7 +287,7 @@ func TestDeleteRemoteBranch(t *testing.T) {
 	// populate the scratch repo with some files, stuff, etc.
 	sr := te.NewScratchRepo(t)
 
-	sr.Git(t, "init")
+	sr.init(t)
 	sr.Git(t, "checkout", "-b", "b1")
 	sr.WriteFile(t, "a", "11111")
 	sr.Git(t, "add", ".")
@@ -304,7 +304,7 @@ func TestOneArgClone(t *testing.T) {
 	err = te.Init()
 	require.NoError(t, err)
 	sr := te.NewScratchRepo(t)
-	sr.Git(t, "init")
+	sr.init(t)
 	sr.WriteFile(t, "a", "11111")
 	sr.Git(t, "add", ".")
 	sr.Git(t, "commit", "-m", "commit 1")
