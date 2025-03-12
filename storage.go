@@ -107,7 +107,7 @@ func NewLocalCheckDirFromWorkingDirAndGitDir(
 	error,
 ) {
 	var tmp LocalPath
-	if len(gd) > 0 && gd[0] == '/' {
+	if len(gd) > 0 && filepath.IsAbs(string(gd)) {
 		tmp = gd
 	} else {
 		tmp = LocalPath(filepath.Join(string(wd), string(gd)))
