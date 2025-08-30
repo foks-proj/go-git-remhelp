@@ -26,10 +26,12 @@ type FastFetch struct {
 	tl        TermLogger
 }
 
-func dedupeHashes(hs []plumbing.Hash) []plumbing.Hash {
+func dedupeAndCleanupHashes(hs []plumbing.Hash) []plumbing.Hash {
 	tmp := make(map[plumbing.Hash]struct{})
 	for _, h := range hs {
-		tmp[h] = struct{}{}
+		if !h.IsZero() {
+			tmp[h] = struct{}{}
+		}
 	}
 	ret := make([]plumbing.Hash, 0, len(tmp))
 	for h := range tmp {
@@ -57,7 +59,7 @@ func NewFastFetch(
 	// figure out which hashes we need, starting from the tip
 	// commit. We'll then spider the tree to find all the objects
 	// in the transitive closure of the commit graph.
-	wantObjs := dedupeHashes(lmap(args, func(arg FetchArg) plumbing.Hash { return arg.Hash }))
+	wantObjs := dedupeAndCleanupHashes(lmap(args, func(arg FetchArg) plumbing.Hash { return arg.Hash }))
 
 	storage := m.E().Storage()
 	ps := storage.PackSync()
@@ -104,10 +106,6 @@ func (f *FastFetch) Run(m MetaContext) error {
 	if err != nil {
 		return err
 	}
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -187,7 +185,7 @@ func (f *FastFetch) readAllLocalRefs(
 		}
 		tmp = append(tmp, ref.Hash())
 	}
-	f.haveObjs = dedupeHashes(tmp)
+	f.haveObjs = dedupeAndCleanupHashes(tmp)
 	return nil
 }
 

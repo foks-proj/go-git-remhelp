@@ -314,3 +314,24 @@ func TestOneArgClone(t *testing.T) {
 	sr2 := te.NewScratchRepo(t)
 	sr2.Git(t, "clone", sr.Origin())
 }
+
+func TestNoMainBranch(t *testing.T) {
+	te, err := NewTestEnv()
+	defer te.Cleanup()
+	require.NoError(t, err)
+	err = te.Init()
+	require.NoError(t, err)
+	sr := te.NewScratchRepo(t)
+	sr.initWithBranch(t, "dev")
+	sr.WriteFile(t, "a", "11111")
+	sr.Git(t, "add", ".")
+	sr.Git(t, "commit", "-m", "commit 1")
+	sr.Git(t, "remote", "add", "origin", sr.Origin())
+	sr.Git(t, "push", "-u", "origin", "dev")
+
+	sr2 := te.NewScratchRepo(t)
+	sr2.Git(t, "clone", sr.Origin())
+
+	sr3 := te.NewScratchRepo(t)
+	sr3.Git(t, "clone", "-b", "dev", sr.Origin())
+}

@@ -53,6 +53,10 @@ func (r *TestScratchRepo) init(t *testing.T) {
 	r.Git(t, "init", "-b", "main")
 }
 
+func (r *TestScratchRepo) initWithBranch(t *testing.T, branch string) {
+	r.Git(t, "init", "-b", branch)
+}
+
 func (r *TestScratchRepo) setenv(t *testing.T) {
 	r.env.setenv(t)
 }
