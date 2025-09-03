@@ -38,7 +38,7 @@ func (r *TestScratchRepo) Mkdir(t *testing.T, name string) {
 	require.NoError(t, err)
 }
 
-func (r *TestScratchRepo) inDir(t *testing.T, fn func() error) error {
+func (r *TestScratchRepo) InDir(t *testing.T, fn func() error) error {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 	err = os.Chdir(r.dir)
@@ -73,7 +73,7 @@ func (g *GitError) Error() string {
 
 func (r *TestScratchRepo) GitWithErr(t *testing.T, args ...string) error {
 	r.setenv(t)
-	return r.inDir(t, func() error {
+	return r.InDir(t, func() error {
 		git, err := exec.LookPath("git")
 		require.NoError(t, err)
 		t.Logf("running git %v in %s", args, r.dir)

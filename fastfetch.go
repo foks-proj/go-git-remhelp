@@ -71,7 +71,7 @@ func NewFastFetch(
 	if err != nil {
 		return nil, err
 	}
-	rep, err := NewGoGitRepoWithStorage(remote)
+	rep, err := NewGoGitRepoWithStorage(remote, nil)
 	if err != nil {
 		return nil, err
 	}

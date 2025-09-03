@@ -74,14 +74,23 @@ func NewMetaContext(ctx context.Context, e *ExecContext) MetaContext {
 	}
 }
 
-func NewGoGitRepoWithStorage(stor storage.Storer) (*gogit.Repository, error) {
+func NewGoGitRepoWithStorage(
+	stor storage.Storer,
+	defp *plumbing.ReferenceName,
+) (*gogit.Repository, error) {
 
 	// We're initializing with a `nil` FileSystem so therefore we should
 	// get a "bare" repository, which is what we want. But there's a bug,
 	// we're still making a HEAD ref, which we don't want. Either way,
 	// let's use the modern nominal value for the default branch.
+
+	def := plumbing.Main
+	if defp != nil {
+		def = *defp
+	}
+
 	repo, err := gogit.InitWithOptions(stor, nil, gogit.InitOptions{
-		DefaultBranch: plumbing.Main,
+		DefaultBranch: def,
 	})
 
 	if err == nil {
@@ -97,12 +106,15 @@ func NewGoGitRepoWithStorage(stor storage.Storer) (*gogit.Repository, error) {
 	return repo, nil
 }
 
-func (m MetaContext) RemoteRepo(op GitOpType) (*gogit.Repository, error) {
+func (m MetaContext) RemoteRepo(
+	op GitOpType,
+	def *plumbing.ReferenceName,
+) (*gogit.Repository, error) {
 	storage, err := m.E().Storage().ToGitStorage(op)
 	if err != nil {
 		return nil, err
 	}
-	return NewGoGitRepoWithStorage(storage)
+	return NewGoGitRepoWithStorage(storage, def)
 }
 
 type ReverseRemote struct {
@@ -114,11 +126,12 @@ func (r *ReverseRemote) Name() string { return r.name }
 
 func (m MetaContext) ReverseRemote(
 	op GitOpType,
+	def *plumbing.ReferenceName, // Default RefName to use if creating the repo
 ) (
 	*ReverseRemote,
 	error,
 ) {
-	remote, err := m.RemoteRepo(op)
+	remote, err := m.RemoteRepo(op, def)
 	if err != nil {
 		return nil, err
 	}
