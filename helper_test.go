@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -330,8 +331,93 @@ func TestNoMainBranch(t *testing.T) {
 	sr.Git(t, "push", "-u", "origin", "dev")
 
 	sr2 := te.NewScratchRepo(t)
-	sr2.Git(t, "clone", sr.Origin())
+	sr2.Git(t, "clone", sr.Origin(), ".")
+	sr2.ReadFile(t, "a", "11111")
 
 	sr3 := te.NewScratchRepo(t)
-	sr3.Git(t, "clone", "-b", "dev", sr.Origin())
+	sr3.Git(t, "clone", "-b", "dev", sr.Origin(), ".")
+	sr3.ReadFile(t, "a", "11111")
+}
+
+func TestTwoNonMainBranches(t *testing.T) {
+	te, err := NewTestEnv()
+	defer te.Cleanup()
+	require.NoError(t, err)
+	err = te.Init()
+	require.NoError(t, err)
+	sr := te.NewScratchRepo(t)
+	branch1name := "dev"
+	sr.initWithBranch(t, branch1name)
+	aDat := "11111"
+	branch2name := "emo"
+	sr.WriteFile(t, "a", aDat)
+	sr.Git(t, "add", "a")
+	sr.Git(t, "commit", "-m", "commit 1")
+	sr.Git(t, "checkout", "-b", branch2name)
+	bDat := "22222"
+	sr.WriteFile(t, "b", bDat)
+	sr.Git(t, "add", "b")
+	sr.Git(t, "commit", "-m", "commit 2")
+	sr.Git(t, "checkout", branch1name)
+	cDat := "33333"
+	sr.WriteFile(t, "c", cDat)
+	sr.Git(t, "add", "c")
+	sr.Git(t, "commit", "-m", "commit 3")
+	sr.Git(t, "remote", "add", "origin", sr.Origin())
+	sr.Git(t, "push", "--all", "origin")
+
+	// "dev" is going to be the primary since it is alphabetically first
+	sr2 := te.NewScratchRepo(t)
+	sr2.Git(t, "clone", sr.Origin(), ".")
+	sr2.ReadFile(t, "a", aDat)
+	sr2.ReadFile(t, "c", cDat)
+	err = sr2.ReadFileWithErr("b", "")
+	require.Error(t, err)
+	require.IsType(t, &fs.PathError{}, err)
+
+	sr2.Git(t, "checkout", branch2name)
+	sr2.ReadFile(t, "b", bDat)
+	sr2.ReadFile(t, "a", aDat)
+	err = sr2.ReadFileWithErr("c", "")
+	require.Error(t, err)
+	require.IsType(t, &fs.PathError{}, err)
+}
+
+func TestMasterInsteadOfMain(t *testing.T) {
+	te, err := NewTestEnv()
+	defer te.Cleanup()
+	require.NoError(t, err)
+	err = te.Init()
+	require.NoError(t, err)
+	sr := te.NewScratchRepo(t)
+	sr.initWithBranch(t, "dev")
+	sr.WriteFile(t, "a", "11")
+	sr.Git(t, "add", ".")
+	sr.Git(t, "commit", "-m", "commit 1")
+	sr.Git(t, "checkout", "-b", "master")
+	sr.WriteFile(t, "b", "22")
+	sr.Git(t, "add", ".")
+	sr.Git(t, "commit", "-m", "commit 2")
+	sr.Git(t, "checkout", "dev")
+	sr.WriteFile(t, "c", "33")
+	sr.Git(t, "add", ".")
+	sr.Git(t, "commit", "-m", "commit 3")
+	sr.Git(t, "remote", "add", "origin", sr.Origin())
+	sr.Git(t, "push", "--all", "origin")
+
+	sr2 := te.NewScratchRepo(t)
+	sr2.Git(t, "clone", sr.Origin(), ".")
+	sr2.ReadFile(t, "a", "11")
+	sr2.ReadFile(t, "b", "22")
+	err = sr2.ReadFileWithErr("c", "")
+	require.Error(t, err)
+	require.IsType(t, &fs.PathError{}, err)
+
+	sr3 := te.NewScratchRepo(t)
+	sr3.Git(t, "clone", "-b", "dev", sr.Origin(), ".")
+	sr3.ReadFile(t, "a", "11")
+	sr3.ReadFile(t, "c", "33")
+	err = sr3.ReadFileWithErr("b", "")
+	require.Error(t, err)
+	require.IsType(t, &fs.PathError{}, err)
 }

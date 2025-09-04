@@ -2,15 +2,11 @@ package remhelp
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/go-git/go-billy/v5/osfs"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/cache"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/storage/filesystem"
 )
 
 // RefData stores the data for a ref.
@@ -64,6 +60,49 @@ func (c *PushCmd) init(m MetaContext) error {
 	return nil
 }
 
+// firstPushedRef gets the first pushed ref that we should treat as the
+// primate remote branch. It's generally speaking the firt branch pushed
+// so usually will be main. However, if master is pushed instead of main,
+// it will be that, or if `foo` is pushed first without a main or master, it
+// will become `foo`. This seems to match the behavior of github and also
+// standard local git. There should be a knob to change this after the fact
+// since we are essentially guessing the user's intentions here. Note that if
+// you pass a reference name through to init and the repository is already
+// initialized, it will be ignored.
+func (c *PushCmd) firstPushedRef() *plumbing.ReferenceName {
+	var hasMaster, hasMain bool
+	var ret *plumbing.ReferenceName
+	for _, ref := range c.pushes {
+		if ref.IsWildcard() || ref.IsDelete() {
+			continue
+		}
+		dst := ref.Dst("")
+		switch {
+		case dst == plumbing.Main:
+			hasMain = true
+		case dst == plumbing.Master:
+			hasMaster = true
+		case ret == nil:
+			ret = &dst
+		}
+	}
+
+	// if we're pushing multiple branches and we have either main or
+	// master, prefer those, preferring main first.
+	if hasMain {
+		tmp := plumbing.Main
+		return &tmp
+	}
+	if hasMaster {
+		tmp := plumbing.Master
+		return &tmp
+	}
+
+	// Otherwise, we'll take the first pushed ref, which usually turns
+	// out to be the first alphabetically.
+	return ret
+}
+
 func (c *PushCmd) openFetchFrom(m MetaContext) error {
 
 	// In an interesting hack borrowed from the very clever KBFS git implementation,
@@ -71,7 +110,8 @@ func (c *PushCmd) openFetchFrom(m MetaContext) error {
 	// push from the local to the fetchFrom as a fetch from the fetchFrom to the local.
 	// So here "fetchFrom" is the local working directory that the git fetchFrom helper is working in.
 	var err error
-	c.fetchFrom, err = m.ReverseRemote(GitOpTypePush)
+
+	c.fetchFrom, err = m.ReverseRemote(GitOpTypePush, c.firstPushedRef())
 	if err != nil {
 		return err
 	}
@@ -133,80 +173,11 @@ func (c *PushCmd) output(m MetaContext, e error) error {
 	return c.DoOutput(oset.Empty().Res(), nil)
 }
 
-// fixMaster deals with the fact that the remote might have a default branch of master,
-// and the local might have a default branch of main, or vice versa. We remedy this
-// situation by rewriting `HEAD` on the remote if there is no corresponding default
-// branch on local, but the other default branch is found. This seems pretty safe
-// but feels a bit hacky.
-func (c *PushCmd) fixMaster(m MetaContext) error {
-	localStorer := filesystem.NewStorage(
-		osfs.New(m.e.Storage().LocalCheckoutDir().DotGit()),
-		cache.NewObjectLRUDefault(),
-	)
-
-	remoteStorer, err := m.E().Storage().ToGitStorage(GitOpTypePush)
-	if err != nil {
-		return err
-	}
-	remoteRef, err := remoteStorer.Reference(plumbing.HEAD)
-
-	// If we can't find the head reference on the remote, that's ok, no repair needed.
-	if err != nil {
-		return nil
-	}
-
-	// go-git library writes HEAD as `ref: refs/heads/main HEAD`. I'm not sure why,
-	// but we need to strip the `HEAD` part to get the branch name.
-	strip := func(n plumbing.ReferenceName) plumbing.ReferenceName {
-		v := strings.Split(n.String(), " ")
-		return plumbing.ReferenceName(v[0])
-	}
-
-	remoteTarg := strip(remoteRef.Target())
-
-	var toFind plumbing.ReferenceName
-	var switchTo plumbing.ReferenceName
-	switch remoteTarg {
-	case plumbing.Main:
-		toFind = remoteTarg
-		switchTo = plumbing.Master
-	case plumbing.Master:
-		toFind = remoteTarg
-		switchTo = plumbing.Main
-	default:
-		// If remote HEAD is something other than master or main, then no fix.
-		return nil
-	}
-
-	ref, err := localStorer.ReferenceStorage.Reference(toFind)
-	if err == nil && ref != nil {
-		// We found a local branch that matches the remote HEAD, ok to no fix
-		return nil
-	}
-
-	ref, err = localStorer.ReferenceStorage.Reference(switchTo)
-	if err != nil || ref == nil {
-		// We don't have a local master or main, so no fix needed.
-		return nil
-	}
-
-	err = remoteStorer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, switchTo))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (c *PushCmd) Run(m MetaContext) error {
 	err := c.prepareOutput(m)
 	err = c.output(m, err)
 	if err != nil {
 		return err
-	}
-
-	err = c.fixMaster(m)
-	if err != nil {
-		m.DbgLogf("error fixing master: %v", err)
 	}
 	return nil
 }
