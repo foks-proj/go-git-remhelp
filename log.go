@@ -139,5 +139,9 @@ func TermLogMsgFetch(
 	hash plumbing.Hash,
 ) {
 	TermLogf(ctx, tl, (TermLogCr | TermLogNoNewline),
-		MsgFetchObjects+typ+" "+hash.String()[0:8]+" ... ")
+		"%s%s %s ... ",
+		MsgFetchObjects,
+		typ,
+		hash.String()[0:8],
+	)
 }
