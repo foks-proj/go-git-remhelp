@@ -421,3 +421,22 @@ func TestMasterInsteadOfMain(t *testing.T) {
 	require.Error(t, err)
 	require.IsType(t, &fs.PathError{}, err)
 }
+
+func TestEmptyFile(t *testing.T) {
+	te, err := NewTestEnv()
+	defer te.Cleanup()
+	require.NoError(t, err)
+	err = te.Init()
+	require.NoError(t, err)
+	sr := te.NewScratchRepo(t)
+	sr.init(t)
+	sr.WriteFile(t, "a", "")
+	sr.Git(t, "add", ".")
+	sr.Git(t, "commit", "-m", "commit 1")
+	sr.Git(t, "remote", "add", "origin", sr.Origin())
+	sr.Git(t, "push", "origin", "main")
+
+	sr2 := te.NewScratchRepo(t)
+	sr2.Git(t, "clone", sr.Origin(), ".")
+	sr2.ReadFile(t, "a", "")
+}
